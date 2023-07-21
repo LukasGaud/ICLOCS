@@ -42,26 +42,31 @@ x1 = x(:,1);x2 = x(:,2); x3 = x(:,3); x4 = x(:,4);
 % p(2) = mu;
 % p(3) = kt;
 % p(4) = ct;
-ms = p(1,1); mu = p(1,2); kt = p(1,3); ct = p(1,4);
+ms = vdat.auxData.P.ms;
+mu = vdat.auxData.P.mu;
+ct = vdat.auxData.P.ct;
+kt = vdat.auxData.P.kt;
+% kt = p(1,1); ct = p(1,2);
+
+% ms = p(1,1); mu = p(1,2); kt = p(1,3); ct = p(1,4); 
+% Ps = p(1,5); Pt = p(1,6); Pa = p(1,7);
 
 % Inputs
 % u1 - ka;
 % u2 - ca;
 % u3 - cs;
-ka = u(:,1); ca = u(:,2); cs = u(:,3); 
+ks = u(:,1); ka = u(:,2); ca = u(:,3); cs = u(:,4); 
 
 % Data to get the external disturbances
-Fs = interp1(vdat.auxData.LF.tLap, vdat.auxData.LF.FzRear, t, 'linear', 'extrap');
-zr = interp1(vdat.auxData.HF.tLap, vdat.auxData.HF.zRHeaveDot, t, 'linear', 'extrap');
-ks = interp1(vdat.auxData.HF.tLap, vdat.auxData.HF.kStiff, t, 'linear', 'extrap');
+Fs = interp1(vdat.auxData.HF.intervalTime, vdat.auxData.LF.FzRearInterval, t, 'linear', 'extrap');
+zr = interp1(vdat.auxData.HF.intervalTime, vdat.auxData.HF.zRHeaveDotInterval, t, 'linear', 'extrap');
 
 dx(:,1) = x2 - zr;
 
-dx(:,2) = (-ka./ms - ks./ms).*x1 + (-cs./ms - ca./ms).*x2 + (ks./ms).*x3 + (cs./ms).*x4 + Fs./ms;
+dx(:,2) = (-ka./ms - ks./ms).*x1 + (-cs./ms - ca./ms).*x2 + (ks./ms).*x3 + (cs./ms).*x4 + Fs./ms + ca./ms.*zr;
 
 dx(:,3) = x4 - zr;
 
 dx(:,4) = (ks./mu).*x1 + (cs./mu).*x2 + (-ks./mu - kt./mu).*x3 + (-cs./mu - ct./mu).*x4 + (ct/mu)*zr;
-
 
 %------------- END OF CODE --------------

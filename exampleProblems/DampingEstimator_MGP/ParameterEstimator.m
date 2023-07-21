@@ -28,6 +28,10 @@ trackData = load(filename);
 % Choose channels from track data 
 % HF content
 auxData.HF.tLap = trackData.dsResult.dsControl.dsV7P_out.data.inputs.T;
+auxData.P.ms = mean(trackData.dsResult.dsState.chassis.sprung.mass_R);
+auxData.P.mu = mean(trackData.dsResult.dsState.chassis.total.mass_R) - mean(trackData.dsResult.dsState.chassis.sprung.mass_R);
+auxData.P.ct = 70e3;
+auxData.P.kt = 400e3;
 dT = diff(auxData.HF.tLap);
 auxData.HF.dT = dT;
 auxData.HF.zRL = trackData.dsResult.dsControl.dsV7P_out.data.inputs.moveRLx;
@@ -59,23 +63,25 @@ auxData.HF.tLap = tVec;
 
 % Finding straight conditions
 [~, n]=max(auxData.HF.vCar);
-auxData.HF.interval = n-250:n-25;
+auxData.HF.interval = n-500:n-100;
 auxData.HF.intervalTime = 0:1/fPass:(length(auxData.HF.interval)/fPass-1/fPass);
 auxData.HF.zRHeaveInterval = auxData.HF.zRHeave(auxData.HF.interval);
 auxData.HF.zRHeaveDotInterval = auxData.HF.zRHeaveDot(auxData.HF.interval);
-auxData.HF.RRHInterval = auxData.HF.RRH(auxData.HF.interval);
+auxData.HF.RRHInterval = auxData.HF.RRH(auxData.HF.interval)-mean(auxData.HF.RRH(auxData.HF.interval));
+auxData.HF.RRHDotInterval = auxData.HF.RRHDot(auxData.HF.interval);
+
 % LF content
 auxData.LF.tLap = interp1(trackData.dsResult.dsState.time, trackData.dsResult.dsState.time, auxData.HF.tLap, 'linear', 'extrap');
 auxData.LF.tLapInterval = auxData.LF.tLap(auxData.HF.interval);
 auxData.LF.FzRear =  interp1(trackData.dsResult.dsState.time, trackData.dsResult.dsState.aero.body.Fzr, auxData.HF.tLap, 'linear', 'extrap');
 auxData.LF.FzRearInterval = auxData.LF.FzRear(auxData.HF.interval);
 auxData.LF.zRearHub = interp1(trackData.dsResult.dsState.time, (trackData.dsResult.dsState.wheel.RL.z + trackData.dsResult.dsState.wheel.RR.z)/2, auxData.HF.tLap, 'linear', 'extrap');
-auxData.LF.zRearHubInterval = auxData.LF.zRearHub(auxData.HF.interval);
+auxData.LF.zRearHubInterval = auxData.LF.zRearHub(auxData.HF.interval) - mean(auxData.LF.zRearHub(auxData.HF.interval));
 auxData.LF.zDotRearHub = interp1(trackData.dsResult.dsState.time, (trackData.dsResult.dsState.wheel.RL.vz + trackData.dsResult.dsState.wheel.RR.vz)/2, auxData.HF.tLap, 'linear', 'extrap');
 auxData.LF.zDotRearHubInterval = auxData.LF.zDotRearHub(auxData.HF.interval);
 % Plant model name, used for Adigator
-InternalDynamics=@Dynamics_Simple_Internal;
-SimDynamics=@Dynamics_Simple_Sim;
+InternalDynamics=@Dynamics_Internal;
+SimDynamics=@Dynamics_Sim;
 
 % Analytic derivative files (optional)
 problem.analyticDeriv.gradCost=[];
@@ -95,108 +101,142 @@ problem.time.tf_min=auxData.HF.intervalTime(end);
 problem.time.tf_max=auxData.HF.intervalTime(end); 
 guess.tf=auxData.HF.intervalTime(end);
 
-% % Parameters bounds. pl=< p <=pu
-% % p(1) = ms;
-% % p(2) = mu;
-% % p(3) = kt;
-% % p(4) = ct;
+%% Parameters - Detailed Model
+% Parameters bounds. pl=< p <=pu
+% p(1) = ms;
+% p(2) = mu;
+% p(3) = kt;
+% p(4) = ct;
+% p(5) = Ps;
+% p(6) = Pt;
+% p(7) = Pa;
 % problem.parameters.pl=[0, 0, 0, 0];
 % problem.parameters.pu=[Inf, Inf, Inf, Inf];
-% guess.parameters=[400, 30, 300e5, 400];
-%%
-% Parameters bounds. pl=< p <=pu SIMPLE MODEL
-% p(1) = ms;
+% guess.parameters=[400, 30, 300e3, 400];
 
-problem.parameters.pl=[0];
-problem.parameters.pu=[700];
-guess.parameters=[400];
+% p(3) = kt;
+% p(4) = ct;
+% problem.parameters.pl=[0, 0];
+% problem.parameters.pu=[Inf, Inf];
+% guess.parameters=[300e5, 400e3];
 
-%% Detailed model
-% % Initial conditions for system.
-% problem.states.x0=[auxData.HF.RRH(1)-auxData.HF.zRHeave(1), auxData.HF.zRHeaveDot(1), auxData.LF.zRearHub(1), auxData.LF.zDotRearHub(1)];
+problem.parameters.pl=[];
+problem.parameters.pu=[];
+guess.parameters=[];
+%% Parameters - Simple Model
+% % Parameters bounds. pl=< p <=pu SIMPLE MODEL
+% % p(1) = ms;
 % 
-% % Initial conditions for system. Bounds if x0 is free s.t. x0l=< x0 <=x0u
-% problem.states.x0l=[0 -1, 0.2, -1]; 
-% problem.states.x0u=[1, 1, 0.4, 1]; 
-% 
-% % State bounds. xl=< x <=xu
-% problem.states.xl=[0 -1, 0.2, -1];
-% problem.states.xu=[1, 1, 0.4, 1]; 
-% 
-% % State error bounds
-% problem.states.xErrorTol_local=[1e-3 1e-3 1e-3 1e-3];
-% problem.states.xErrorTol_integral=[1e-3 1e-3 1e-3 1e-3];
-% 
-% 
-% % State constraint error bounds
-% problem.states.xConstraintTol=[1e-3 1e-3 1e-3 1e-3];
-% 
-% % Terminal state bounds. xfl=< xf <=xfu
-% problem.states.xfl=[auxData.HF.RRH(end)-auxData.HF.zRHeave(end), auxData.HF.zRHeaveDot(end), auxData.LF.zRearHub(end), auxData.LF.zDotRearHub(end)]-0.01;
-% problem.states.xfu= [auxData.HF.RRH(end)-auxData.HF.zRHeave(end), auxData.HF.zRHeaveDot(end), auxData.LF.zRearHub(end), auxData.LF.zDotRearHub(end)]+0.01;
-% 
-% % Guess the state trajectories with [x0 xf]
-% % x1Guess = interp1(auxData.HF.tLap, auxData.HF.RRH - auxData.HF.zRHeave, auxData.LF.tLap, 'linear', 'extrap');
-% % x2Guess = interp1(auxData.HF.tLap, auxData.HF.RRHDot, auxData.LF.tLap, 'linear', 'extrap');
-% % x3Guess = auxData.LF.zRearHub - interp1(auxData.HF.tLap, auxData.HF.zRHeave, auxData.LF.tLap, 'linear', 'extrap');
-% % x4Guess = auxData.LF.zDotRearHub;
-% 
-% % Guesses using HF data
-% x1Guess = auxData.HF.RRH - auxData.HF.zRHeave;
-% x2Guess = auxData.HF.RRHDot;
-% x3Guess = interp1(auxData.LF.tLap, auxData.LF.zRearHub, auxData.HF.tLap, 'linear', 'extrap') - auxData.HF.zRHeave;
-% x4Guess = interp1(auxData.LF.tLap, auxData.LF.zDotRearHub, auxData.HF.tLap, 'linear', 'extrap');
-% 
-% guess.time= auxData.HF.tLap;
-% guess.states(:,1)=x1Guess;
-% guess.states(:,2)=x2Guess;
-% guess.states(:,3)=x3Guess;
-% guess.states(:,4)=x4Guess;
+% problem.parameters.pl=[0];
+% problem.parameters.pu=[700];
+% guess.parameters=[400];
 
-%% Simple model
+%% States - Detailed model
 % Initial conditions for system.
-problem.states.x0=[auxData.HF.RRH(auxData.HF.interval(1))-auxData.HF.zRHeave(auxData.HF.interval(1)), auxData.HF.zRHeaveDot(auxData.HF.interval(1))];
+problem.states.x0=[auxData.HF.RRHInterval(1)-auxData.HF.zRHeaveInterval(1), auxData.HF.zRHeaveDot(auxData.HF.interval(1)), auxData.LF.zRearHubInterval(1)-auxData.HF.zRHeave(auxData.HF.interval(1)), auxData.LF.zDotRearHub(auxData.HF.interval(1))];
 
 % Initial conditions for system. Bounds if x0 is free s.t. x0l=< x0 <=x0u
-problem.states.x0l=[0 -1]; 
-problem.states.x0u=[1, 1]; 
+problem.states.x0l=[-10 -10, -10, -10];
+problem.states.x0u=[10, 10, 10, 10];  
 
 % State bounds. xl=< x <=xu
-problem.states.xl=[0 -1];
-problem.states.xu=[1, 1]; 
+problem.states.xl=[-10 -10, -10, -10];
+problem.states.xu=[10, 10, 10, 10]; 
 
 % State error bounds
-problem.states.xErrorTol_local=[1e-3 1e-3];
-problem.states.xErrorTol_integral=[1e-3 1e-3];
+problem.states.xErrorTol_local=[1e-3 1e-3 1e-3 1e-3];
+problem.states.xErrorTol_integral=[1e-3 1e-3 1e-3 1e-3];
 
 
 % State constraint error bounds
-problem.states.xConstraintTol=[1e-3 1e-3];
+problem.states.xConstraintTol=[1e-3 1e-3 1e-3 1e-3];
 
 % Terminal state bounds. xfl=< xf <=xfu
-problem.states.xfl=[auxData.HF.RRH(auxData.HF.interval(end))-auxData.HF.zRHeave(auxData.HF.interval(end)), auxData.HF.zRHeaveDot(auxData.HF.interval(end))]-0.01;
-problem.states.xfu= [auxData.HF.RRH(auxData.HF.interval(end))-auxData.HF.zRHeave(auxData.HF.interval(end)), auxData.HF.zRHeaveDot(auxData.HF.interval(end))]+0.01;
-
-% Guess the state trajectories with [x0 xf]
-% x1Guess = interp1(auxData.HF.tLap, auxData.HF.RRH - auxData.HF.zRHeave, auxData.LF.tLap, 'linear', 'extrap');
-% x2Guess = interp1(auxData.HF.tLap, auxData.HF.RRHDot, auxData.LF.tLap, 'linear', 'extrap');
-% x3Guess = auxData.LF.zRearHub - interp1(auxData.HF.tLap, auxData.HF.zRHeave, auxData.LF.tLap, 'linear', 'extrap');
-% x4Guess = auxData.LF.zDotRearHub;
+problem.states.xfl=[auxData.HF.RRHInterval(end)-auxData.HF.zRHeaveInterval(end), auxData.HF.zRHeaveDot(auxData.HF.interval(end)), auxData.LF.zRearHubInterval(end)-auxData.HF.zRHeave(auxData.HF.interval(end)), auxData.LF.zDotRearHub(auxData.HF.interval(end))];
+problem.states.xfu= [auxData.HF.RRHInterval(end)-auxData.HF.zRHeaveInterval(end), auxData.HF.zRHeaveDot(auxData.HF.interval(end)), auxData.LF.zRearHubInterval(end)-auxData.HF.zRHeave(auxData.HF.interval(end)), auxData.LF.zDotRearHub(auxData.HF.interval(end))];
 
 % Guesses using HF data
-x1Guess = auxData.HF.RRH(auxData.HF.interval) - auxData.HF.zRHeave(auxData.HF.interval);
+x1Guess = auxData.HF.RRHInterval - auxData.HF.zRHeaveInterval;
 x2Guess = auxData.HF.RRHDot(auxData.HF.interval);
+x3Guess = auxData.LF.zRearHubInterval - auxData.HF.zRHeaveInterval;
+x4Guess = auxData.LF.zDotRearHubInterval;
 
-guess.time= auxData.HF.tLap(auxData.HF.interval);
+guess.time= auxData.HF.intervalTime;
 guess.states(:,1)=x1Guess;
 guess.states(:,2)=x2Guess;
+guess.states(:,3)=x3Guess;
+guess.states(:,4)=x4Guess;
 
+%% States - Simple model
+% % Initial conditions for system.
+% problem.states.x0=[auxData.HF.RRH(auxData.HF.interval(1))-auxData.HF.zRHeave(auxData.HF.interval(1)), auxData.HF.zRHeaveDot(auxData.HF.interval(1))];
+% 
+% % Initial conditions for system. Bounds if x0 is free s.t. x0l=< x0 <=x0u
+% problem.states.x0l=[0 -1]; 
+% problem.states.x0u=[1, 1]; 
+% 
+% % State bounds. xl=< x <=xu
+% problem.states.xl=[0 -1];
+% problem.states.xu=[1, 1]; 
+% 
+% % State error bounds
+% problem.states.xErrorTol_local=[1e-3 1e-3];
+% problem.states.xErrorTol_integral=[1e-3 1e-3];
+% 
+% 
+% % State constraint error bounds
+% problem.states.xConstraintTol=[1e-3 1e-3];
+% 
+% % Terminal state bounds. xfl=< xf <=xfu
+% problem.states.xfl=[auxData.HF.RRH(auxData.HF.interval(end))-auxData.HF.zRHeave(auxData.HF.interval(end)), auxData.HF.zRHeaveDot(auxData.HF.interval(end))]-0.01;
+% problem.states.xfu= [auxData.HF.RRH(auxData.HF.interval(end))-auxData.HF.zRHeave(auxData.HF.interval(end)), auxData.HF.zRHeaveDot(auxData.HF.interval(end))]+0.01;
+% 
+% % Guesses using HF data
+% x1Guess = auxData.HF.RRH(auxData.HF.interval) - auxData.HF.zRHeave(auxData.HF.interval);
+% x2Guess = auxData.HF.RRHDot(auxData.HF.interval);
+% 
+% guess.time= auxData.HF.tLap(auxData.HF.interval);
+% guess.states(:,1)=x1Guess;
+% guess.states(:,2)=x2Guess;
 
+%% Residual Error
 % Residual Error Scale
 % problem.states.ResErrorScale
 % problem.states.resCusWeight
 
 %% CONTROL - DETAILED MODEL
+% Number of control actions N 
+% Set problem.inputs.N=0 if N is equal to the number of integration steps.  
+% Note that the number of integration steps defined in settings.m has to be divisible 
+% by the  number of control actions N whenever it is not zero.
+problem.inputs.N=0;       
+      
+% Input bounds
+% u1 - ks
+% u2 - ka;
+% u3 - ca;
+% u4 - cs;
+problem.inputs.ul=[0, -inf -inf 0];
+problem.inputs.uu=[inf inf inf inf];
+
+% Bounds on the first control action
+problem.inputs.u0l=[0 -inf -inf, 0];
+problem.inputs.u0u=[inf inf inf, inf];
+
+% Input rate constraint
+% problem.inputs.url=[-1e4, -1e4, -1e4, -1e4];
+% problem.inputs.uru=[1e4, 1e4, 1e4, 1e4]; 
+
+% Input constraint error bounds
+problem.inputs.uConstraintTol=[10, 10, 10, 10];
+
+% Guess the input sequences with [u0 uf]
+guess.inputs(:, 1) = 300e3*ones(length(auxData.HF.intervalTime), 1);
+guess.inputs(:, 2) = zeros(length(auxData.HF.intervalTime), 1);
+guess.inputs(:, 3) = zeros(length(auxData.HF.intervalTime), 1);
+guess.inputs(:, 4) = 20e3*ones(length(auxData.HF.intervalTime), 1);
+
+%% CONTROL - SIMPLE MODEL
 % % Number of control actions N 
 % % Set problem.inputs.N=0 if N is equal to the number of integration steps.  
 % % Note that the number of integration steps defined in settings.m has to be divisible 
@@ -207,55 +247,25 @@ guess.states(:,2)=x2Guess;
 % % u1 - ka;
 % % u2 - ca;
 % % u3 - cs;
-% problem.inputs.ul=[-inf -inf -inf];
-% problem.inputs.uu=[inf inf inf];
+% problem.inputs.ul=[-inf -inf];
+% problem.inputs.uu=[inf inf];
 % 
 % % Bounds on the first control action
-% problem.inputs.u0l=[-inf -inf -inf];
-% problem.inputs.u0u=[inf inf inf];
+% problem.inputs.u0l=[-inf -inf];
+% problem.inputs.u0u=[inf inf];
 % 
 % % Input rate constraint
-% problem.inputs.url=[-1e4, -1e4, -1e4];
-% problem.inputs.uru=[1e4, 1e4, 1e4]; 
+% problem.inputs.url=[-1e4, -1e4];
+% problem.inputs.uru=[1e4, 1e4]; 
 % 
 % % Input constraint error bounds
-% problem.inputs.uConstraintTol=[1, 1, 1];
+% problem.inputs.uConstraintTol=[1, 1];
 % 
 % % Guess the input sequences with [u0 uf]
-% guess.inputs(:,1) = zeros(length(auxData.HF.tLap), 1);
-% guess.inputs(:,2) = zeros(length(auxData.HF.tLap), 1);
-% guess.inputs(:, 3) = 20e3*ones(length(auxData.HF.tLap), 1);
+% guess.inputs(:,1) = zeros(length(auxData.HF.intervalTime), 1);
+% guess.inputs(:,2) = zeros(length(auxData.HF.intervalTime), 1);
 
-%% CONTROL - SIMPLE MODEL
-% Number of control actions N 
-% Set problem.inputs.N=0 if N is equal to the number of integration steps.  
-% Note that the number of integration steps defined in settings.m has to be divisible 
-% by the  number of control actions N whenever it is not zero.
-problem.inputs.N=0;       
-      
-% Input bounds
-% u1 - ka;
-% u2 - ca;
-% u3 - cs;
-problem.inputs.ul=[-inf -inf -inf];
-problem.inputs.uu=[inf inf inf];
-
-% Bounds on the first control action
-problem.inputs.u0l=[-inf -inf -inf];
-problem.inputs.u0u=[inf inf inf];
-
-% Input rate constraint
-problem.inputs.url=[-1e4, -1e4, -1e4];
-problem.inputs.uru=[1e4, 1e4, 1e4]; 
-
-% Input constraint error bounds
-problem.inputs.uConstraintTol=[1, 1, 1];
-
-% Guess the input sequences with [u0 uf]
-guess.inputs(:,1) = zeros(length(auxData.HF.intervalTime), 1);
-guess.inputs(:,2) = zeros(length(auxData.HF.intervalTime), 1);
-guess.inputs(:, 3) = 20e3*ones(length(auxData.HF.intervalTime), 1);
-
+%% Set points
 % Choose the set-points if required
 problem.setpoints.states=[];
 problem.setpoints.inputs=[];
@@ -320,17 +330,20 @@ function stageCost=L_unscaled(x,xr,u,ur,p,t,vdat)
 
 %------------- BEGIN CODE --------------
 dataX1 = vdat.auxData.HF.RRHInterval- vdat.auxData.HF.zRHeaveInterval;
+dataX2 = vdat.auxData.HF.RRHDotInterval;
 dataTime = vdat.auxData.HF.intervalTime;
 
 sampledTrackX1 = interp1(dataTime, dataX1, t, 'linear', 'extrap');
-
+sampledTrackX2 = interp1(dataTime, dataX2, t, 'linear', 'extrap');
 e1=x(:,1)-sampledTrackX1;
+e2 = x(:, 2) - sampledTrackX2;
 % u1 = u(:,1);
 % u2 = u(:,2);
-
+q1 = 300;
+q2 = 1;
 
 % stageCost = e1.*e1+e2.*e2 + u1.*u1*0.0001 + u2.*u2*0.0001;
-stageCost = e1.*e1;
+stageCost = q1*e1.*e1 + q2*e2.*e2;
 %------------- END OF CODE --------------
 
 
