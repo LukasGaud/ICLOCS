@@ -89,12 +89,12 @@ i = 1;
     hold on
     Ax = gca;
     % ca
-    plot(Ax, solution{i}.T, solution{i}.U(:,1), 'LineWidth', 2, 'LineStyle', linestyle(index1), 'Color', colors(index1))
+    plot(Ax, solution{i}.T, solution{i}.U(:,2), 'LineWidth', 2, 'LineStyle', linestyle(index1), 'Color', colors(index1))
     leg1{index1} = ['ca - ', Driver, ' L', num2str(Lap), ' sLap:', num2str(sLapStart), ':', num2str(sLapEnd)];
     index1 = index1 + 1;
 
     % ca - PSD
-    plot(Ax, solutionPSD{i}.T, solutionPSD{i}.U(:,1), 'LineWidth', 2, 'LineStyle', linestyle(index1), 'Color', colors(index1))
+    plot(Ax, solutionPSD{i}.T, solutionPSD{i}.U(:,2), 'LineWidth', 2, 'LineStyle', linestyle(index1), 'Color', colors(index1))
     leg1{index1} = ['ca PSD - ', Driver, ' L', num2str(Lap), ' sLap:', num2str(sLapStart), ':', num2str(sLapEnd)];
     index1 = index1 + 1;
 
@@ -109,12 +109,12 @@ i = 1;
     hold on
     Ax = gca;
     % ka
-    plot(Ax, solution{i}.T, solution{i}.U(:,2), 'LineWidth', 2, 'LineStyle', linestyle(index2), 'Color', colors(index2))
+    plot(Ax, solution{i}.T, solution{i}.U(:,1), 'LineWidth', 2, 'LineStyle', linestyle(index2), 'Color', colors(index2))
     leg2{index2} = ['ka - ', Driver, ' L', num2str(Lap), ' sLap:', num2str(sLapStart), ':', num2str(sLapEnd)];
     index2 = index2 + 1;
 
     % ka - PSD
-    plot(Ax, solutionPSD{i}.T, solutionPSD{i}.U(:,2), 'LineWidth', 2, 'LineStyle', linestyle(index2), 'Color', colors(index2))
+    plot(Ax, solutionPSD{i}.T, solutionPSD{i}.U(:,1), 'LineWidth', 2, 'LineStyle', linestyle(index2), 'Color', colors(index2))
     leg2{index2} = ['ka - PSD - ', Driver, ' L', num2str(Lap), ' sLap:', num2str(sLapStart), ':', num2str(sLapEnd)];
     index2 = index2 + 1;
 
@@ -136,7 +136,7 @@ i = 1;
     plot(Axf22, problem{i}.data.auxData.HF.intervalTime, problem{i}.data.auxData.HF.FzRearInterval, 'LineWidth', 2, 'LineStyle', linestyle(index3), 'Color', colors(index3))
 
     % Road Displacement
-    zr = cumtrapz(solution{i}.T, solution{i}.U(:,3));
+    zr = cumtrapz(problem{i}.data.auxData.HF.intervalTime, problem{i}.data.auxData.HF.roadVec);
     plot(Axf24, problem{i}.data.auxData.HF.intervalTime, zr*1000, 'LineWidth', 2, 'LineStyle', linestyle(index3), 'Color', colors(index3))
     
     leg3{index3} = [Driver, ' L', num2str(Lap), ' sLap: ', num2str(sLapStart), ':', num2str(sLapEnd)];
@@ -160,12 +160,12 @@ i = 1;
     plot(Axf33, (solutionPSD{i}.X(:,1) + mean(problem{i}.data.auxData.HF.RRHSetup))*1000, solutionPSD{i}.U(:,1), 'LineWidth', 1, 'Color', [colorsRGB(index4+1, :), 0.1]);
  
     % ka vs RRH_Dot
-    plot(Axf32, solution{i}.X(:,2) - solution{i}.U(:,3) , solution{i}.U(:,2), '.', 'MarkerSize', 5, 'Color', colors(index4))
-    plot(Axf32, solution{i}.X(:,2) - solution{i}.U(:,3) , solution{i}.U(:,2), 'LineWidth', 1, 'Color', [colorsRGB(index4, :), 0.1]);
+    plot(Axf32, solution{i}.X(:,2), solution{i}.U(:,1), '.', 'MarkerSize', 5, 'Color', colors(index4))
+    plot(Axf32, solution{i}.X(:,2), solution{i}.U(:,1), 'LineWidth', 1, 'Color', [colorsRGB(index4, :), 0.1]);
     
     % PSD parameters
-    plot(Axf32, solutionPSD{i}.X(:,2), solutionPSD{i}.U(:,2), '.', 'MarkerSize', 5, 'Color', colors(index4+1))
-    plot(Axf32, solutionPSD{i}.X(:,2), solutionPSD{i}.U(:,2), 'LineWidth', 1, 'Color', [colorsRGB(index4+1, :), 0.1]);
+    plot(Axf32, solutionPSD{i}.X(:,2), solutionPSD{i}.U(:,1), '.', 'MarkerSize', 5, 'Color', colors(index4+1))
+    plot(Axf32, solutionPSD{i}.X(:,2), solutionPSD{i}.U(:,1), 'LineWidth', 1, 'Color', [colorsRGB(index4+1, :), 0.1]);
    
     % ka vs RRH_Dot
     pScatter(index4) = plot(Axf34, solution{i}.X(:,2), solution{i}.U(:,1), '.', 'MarkerSize', 5, 'Color', colors(index4));

@@ -136,7 +136,7 @@ for i = 1:size(problem,2)
     plot(Axf22, problem{i}.data.auxData.HF.intervalTime, problem{i}.data.auxData.HF.FzRearInterval, 'LineWidth', 2, 'LineStyle', linestyle(index3), 'Color', colors(index3))
 
     % Road Displacement
-    zr = cumtrapz(problem{i}.data.auxData.HF.intervalTime, problem{i}.data.auxData.HF.roadVecInterval);
+    zr = cumtrapz(problem{i}.data.auxData.HF.intervalTime, problem{i}.data.auxData.HF.roadVec);
     plot(Axf24, problem{i}.data.auxData.HF.intervalTime, zr*1000, 'LineWidth', 2, 'LineStyle', linestyle(index3), 'Color', colors(index3))
     
     leg3{index3} = [Driver, ' L', num2str(Lap), ' sLap: ', num2str(sLapStart), ':', num2str(sLapEnd)];
@@ -245,7 +245,7 @@ for i = 1:size(problem,2)
     % z_s-z_r
     plot(Axf41, problem{i}.data.auxData.HF.intervalTime, (problem{i}.data.auxData.HF.RRHInterval+ mean(problem{i}.data.auxData.HF.RRHSetup))*1000, 'LineWidth', 2, 'LineWidth', 2, 'LineStyle', linestyle(index5), 'Color', colors(index5))
     % z_s dot
-    plot(Axf42, problem{i}.data.auxData.HF.intervalTime, (problem{i}.data.auxData.HF.RRHDotInterval + problem{i}.data.auxData.HF.roadVecInterval)*1000, 'LineWidth', 2, 'LineWidth', 2, 'LineStyle', linestyle(index5), 'Color', colors(index5))
+    plot(Axf42, problem{i}.data.auxData.HF.intervalTime, (problem{i}.data.auxData.HF.RRHDotInterval + problem{i}.data.auxData.HF.roadVec)*1000, 'LineWidth', 2, 'LineWidth', 2, 'LineStyle', linestyle(index5), 'Color', colors(index5))
     % z_u - z_s
     plot(Axf43, problem{i}.data.auxData.HF.intervalTime, (problem{i}.data.auxData.HF.xBumpRInterval*1000), 'LineWidth', 2, 'LineWidth', 2, 'LineStyle', linestyle(index5), 'Color', colors(index5))
     % (z_u - z_s) dot
@@ -257,12 +257,11 @@ for i = 1:size(problem,2)
     
     % Fz
     figure
-    hold on
-    plot(solution{1}.T, solution{1}.U(:,3), 'LineWidth', 2, 'LineStyle', linestyle(index3), 'Color', colors(1))
-    plot(solutionPSD{1}.T, solutionPSD{1}.U(:,3), 'LineWidth', 2, 'LineStyle', linestyle(1), 'Color', colors(2))
-    plot(solutionConst{1}.T, solutionConst{1}.U(:,1), 'LineWidth', 2, 'LineStyle', linestyle(1), 'Color', colors(3))
-    plot(problem{i}.data.auxData.HF.intervalTime, problem{i}.data.auxData.HF.FzRearInterval, 'LineWidth', 2, 'LineStyle', linestyle(1), 'Color', colors(4))
-
+    hols on
+    plot(solution{1}.T, solution{1}.U(:,3))
+    plot(solutionPSD{1}.T, solutionPSD{1}.U(:,3))
+    plot(solutionPSDConst{1}.T, solutionPSDConst{1}.U(:,3))
+    
 end
 
 % All states compare - EoS

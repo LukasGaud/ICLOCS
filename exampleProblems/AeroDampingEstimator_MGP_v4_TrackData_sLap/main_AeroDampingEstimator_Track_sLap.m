@@ -46,12 +46,11 @@ dataList = {
 for iData = 1:size(dataList,1)
     [trackData, sessionDetails] = dal.read('filepath', dataList{iData,1}, 'parameters', channels, 'Laps', dataList{iData,2}, 'frequency', 200);
     % prepare the problem
-    [problem{iData},guess{iData}]=AeroDampingEstimator_Track_sLap(trackData, sessionDetails, dataList{iData, 3}, dataList{iData,4});          % Fetch the problem definition
-    
+    [problem{iData},guess{iData}]=AeroDampingEstimator_Track_stochRoad(trackData, sessionDetails, dataList{iData, 3}, dataList{iData,4});          % Fetch the problem definition
     options{iData}= problem{iData}.settings(length(problem{iData}.data.auxData.HF.intervalTime));                  % Get options and solver settings 
     [solution{iData},MRHistory{iData}]=solveMyProblem(problem{iData},guess{iData},options{iData});
 
-    [problemConst{iData},guessConst{iData}]=AeroDampingEstimator_Param_sLap(problem{iData}.data.auxData, solution{iData}.U(:,3));          % Fetch the problem definition
+    [problemConst{iData},guessConst{iData}]=AeroDampingEstimator_Param_Only_PSD(problem{iData}.data.auxData);
     optionsConst{iData} = problemConst{iData}.settings(length(problemConst{iData}.data.auxData.HF.intervalTime));                  % Get options and solver settings 
     [solutionConst{iData},MRHistoryConst{iData}]=solveMyProblem(problemConst{iData},guessConst{iData},optionsConst{iData});
 
