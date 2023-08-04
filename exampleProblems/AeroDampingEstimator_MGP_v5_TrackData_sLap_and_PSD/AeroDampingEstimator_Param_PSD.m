@@ -208,13 +208,13 @@ sampledTrackX6 = interp1(dataTime, dataX6, t, 'linear', 'extrap');
 [track.x4_psd, track.y4_psd] = fnPSD(t, sampledTrackX6, 'HighPassFreq', 3);
 
 alpha = p(1,5);
-zrDot = alpha*interp1(vdat.auxData.HF.intervalTime, vdat.auxData.P.roadVec, t, 'linear', 'extrap');
+zrDot = alpha*interp1(vdat.auxData.HF.intervalTime, vdat.auxData.HF.roadVecInterval, t, 'linear', 'extrap');
 
 if size(x,1) == length(t)
-    [model.x1_psd, model.y1_psd] = fnPSD(t, x(:,1), 'HighPassFreq', 3);
-    [model.x2_psd, model.y2_psd] = fnPSD(t, (x(:,2) - zrDot), 'HighPassFreq', 3);
-    [model.x3_psd, model.y3_psd] = fnPSD(t, (x(:,3) - x(:,1)), 'HighPassFreq', 3);
-    [model.x4_psd, model.y4_psd] = fnPSD(t, (x(:,4) - x(:,2)), 'HighPassFreq', 3);
+    [model.x1_psd, model.y1_psd] = fnPSD(t, x(:,1), 'HighPassFreq', 2, 'HighPassOrder', 3);
+    [model.x2_psd, model.y2_psd] = fnPSD(t, (x(:,2) - zrDot), 'HighPassFreq', 2, 'HighPassOrder', 3);
+    [model.x3_psd, model.y3_psd] = fnPSD(t, (x(:,3) - x(:,1)), 'HighPassFreq', 2, 'HighPassOrder', 3);
+    [model.x4_psd, model.y4_psd] = fnPSD(t, (x(:,4) - x(:,2)), 'HighPassFreq', 2, 'HighPassOrder', 3);
     
     % Resample to the same length in frequency domain
     f = 0:0.01:10;
@@ -233,8 +233,8 @@ if size(x,1) == length(t)
     
     % Weightings
     q1 = 1e6;
-    q2 = 1e-2;
-    q3 = 2e7;
+    q2 = 1e1;
+    q3 = 2e8;
     q4 = 1e1;
     
     % errors
@@ -243,9 +243,9 @@ if size(x,1) == length(t)
     e3 = abs(TrackX3 - ModelX3);
     e4 = abs(TrackX4 - ModelX4);
 
-%     Cost = q1*e1*(e1') + q2*e2*(e2') + q3*e3*(e3') + q4*e4*(e4');
+%     Cost = q1*e1*(e1') + q3*e3*(e3');
 %     Cost = q1*e1*(e1');
-    Cost = q1*e1*(e1') + q3*e3*(e3');
+    Cost = q1*e1*(e1') + q3*e3*(e3') + q2*e2*(e2') + q4*e4*(e4');
 else
     Cost = inf;
 end

@@ -105,7 +105,7 @@ auxData.P.xHubR0 = mean(xHubR0(~isnan(xHubR0)));
 auxData.HF.RRHSetup = trackData.hRideSetupR_VAP/1000;
 
 auxData.HF.sLap = trackData.sLap;
-auxData.HF.roadVec = randn(length(auxData.HF.tLap),1);
+% auxData.HF.roadVec = randn(length(auxData.HF.tLap),1);
 fPass = 20; %50Hz lowpass freq
 fields = fieldnames(auxData.HF);
 deltaTime = 1/200;
@@ -154,7 +154,7 @@ auxData.HF.xBumpRDotInterval = auxData.HF.xBumpRDot(auxData.HF.interval);
 auxData.HF.FzRearInterval = auxData.HF.FzRear(auxData.HF.interval);
 
 auxData.HF.vCarInterval = auxData.HF.vCar(auxData.HF.interval);
-auxData.HF.roadVecInterval = auxData.HF.roadVec(auxData.HF.interval);
+auxData.HF.roadVecInterval = randn(length(auxData.HF.interval),1);
 %% Plant model name, used for Adigator
 InternalDynamics=@Dynamics_Internal_stochRoad;
 SimDynamics=@Dynamics_Sim;
@@ -361,7 +361,7 @@ sampledRoad = interp1(dataTime, dataRoad, t, 'linear', 'extrap');
 % e4 = x(:,4) - sampledTrackX4; 
 
 e1 = x(:,1) - sampledTrackX1;
-e2 = x(:,2) - sampledTrackX2 - sampledRoad;
+e2 = x(:,2) - sampledTrackX2 - p(1,3)*sampledRoad;
 % e3 = x(:,3) - sampledTrackX3;
 % e4 = x(:,4) - sampledTrackX4 - u(:,3); 
 e5 = (x(:,3)-x(:,1)) - sampledTrackX5;
@@ -377,18 +377,17 @@ e6 = (x(:,4)-x(:,2)) - sampledTrackX6;
 % e5 = Ftotal/kt - (x(:,3) - u(:,5));
 % u1 = u(:,1);
 % u2 = u(:,2);
-q1 = 1e5;
-q2 = 1e2;
+q1 = 2e6;
+q2 = 1e1;
 q3 = 1e4;
 q4 = 1;
-q5 = 3e5;
-q6 = 1e2;
+q5 = 2e6;
+q6 = 5e2;
 % q5 = 1e2;
 
-% stageCost = q1*e1.*e1 + q2*e2.*e2 + q3*e3.*e3 + q4*e4.*e4 + q5*e5.*e5;
-% stageCost = q1*e1.*e1 + q2*e2.*e2 + q3*e3.*e3 + q4*e4.*e4;
-% stageCost = q1*e1.*e1 + q2*e2.*e2 + q5*e5.*e5 + q6*e6.*e6;
-stageCost = q1*e1.*e1 + q5*e5.*e5;
+stageCost = q1*e1.*e1 + q2*e2.*e2 + q5*e5.*e5 + q6*e6.*e6;
+% stageCost = q1*e1.*e1 + q5*e5.*e5 + q6*e6.*e6;
+% stageCost = q1*e1.*e1 + q5*e5.*e5;
 
 % stageCost = q1*e1.*e1;
 %------------- END OF CODE --------------

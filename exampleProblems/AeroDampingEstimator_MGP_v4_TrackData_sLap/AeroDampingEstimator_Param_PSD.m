@@ -208,7 +208,7 @@ sampledTrackX6 = interp1(dataTime, dataX6, t, 'linear', 'extrap');
 [track.x4_psd, track.y4_psd] = fnPSD(t, sampledTrackX6, 'HighPassFreq', 3);
 
 alpha = p(1,5);
-zrDot = alpha*interp1(vdat.auxData.HF.intervalTime, vdat.auxData.P.roadVec, t, 'linear', 'extrap');
+zrDot = alpha*interp1(vdat.auxData.HF.intervalTime, vdat.auxData.HF.roadVecInterval, t, 'linear', 'extrap');
 
 if size(x,1) == length(t)
     [model.x1_psd, model.y1_psd] = fnPSD(t, x(:,1), 'HighPassFreq', 3);
@@ -233,9 +233,9 @@ if size(x,1) == length(t)
     
     % Weightings
     q1 = 1e6;
-    q2 = 1e-2;
-    q3 = 2e7;
-    q4 = 1e1;
+    q2 = 1;
+    q3 = 2e8;
+    q4 = 1;
     
     % errors
     e1 = abs(TrackX1 - ModelX1);

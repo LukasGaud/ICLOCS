@@ -1,4 +1,4 @@
-function [problem,guess] = AeroDampingEstimator_Track_stochRoad(trackData, sessionDetails, sLapStart, sLapEnd)
+function [problem,guess] = AeroDampingEstimator_Param_Only_PSD(auxData)
 %DoubleIntergratorTracking - Double Integrator Tracking Problem
 %
 % Syntax:  [problem,guess] = DoubleIntergratorTracking
@@ -21,142 +21,8 @@ function [problem,guess] = AeroDampingEstimator_Track_stochRoad(trackData, sessi
 
 %------------- BEGIN CODE --------------
 
-% Load Track data
-% filename = '\\Barf1.com\prf\DLS\PreEvent\2023\06_04Bcn\A_4_Baseline_V7P\Output\Bsl_Race\Bsl_Race_0001.mat';
-% trackData = load(filename);
-
-motionRatio = 1.0422;
-
-% Instantaneous stiffness
-
-% Instantaneous damping
-% FDam = trackData.FDamperRC_vts;
-% vDam = trackData.vDamperRC_vts/1000;
-% [vDam, unId] = unique(vDam);
-% FDam = FDam(unId);
-
-% dFDam = diff(FDam);
-% dvDam = diff(vDam);
-% cDam = dFDam./dvDam;
-% cDam = [cDam; cDam(end)];
-
-FDam = trackData.FDamperRC_vts;
-vDam = trackData.vDamperRC_vts/1000;
-
-vDamVec = -1:0.01:1;
-% cDamVec = spline(vDam, cDam, vDamVec);
-% cDamLinearVec = interp1(vDam, cDam, vDamVec, 'linear');
-cutOffSpeed = 0.2;
-pDam = polyfit(vDam, FDam, 5);
-FDamPolyVec = polyval(pDam, vDamVec);
-pDamDer = polyder(pDam);
-cDamPolyVec = polyval(pDamDer, vDamVec);
-[~, NegSpeedIndex] = min(abs(vDamVec+cutOffSpeed));
-[~, PosSpeedIndex] = min(abs(vDamVec-cutOffSpeed));
-cDamCap = [cDamPolyVec(NegSpeedIndex)*ones(1, NegSpeedIndex-1), cDamPolyVec(NegSpeedIndex:PosSpeedIndex), cDamPolyVec(PosSpeedIndex)*ones(1, length(vDamVec)-PosSpeedIndex)];
-
-auxData.P.csVec = cDamCap*motionRatio^2;
-auxData.P.vDamVec = vDamVec;
-
-% kStiffness from SVA
-
-% xHeaveVec = trackData.dsResult.dsControl.dsPolarisSVA_out.data.car.rearSuspension.left.wheelHub.xBump;
-% ksVec = trackData.dsResult.dsControl.dsPolarisSVA_out.data.car.rearSuspension.KWheelRateDynamicRL;
-
-ksVec = trackData.KHeaveAxleR_VAP;
-
-xHeaveVec = (trackData.xWheelSetupRR_VAP + trackData.xWheelSetupRL_VAP)/2/1000;
-% ksVec = trackData.dsResult.dsControl.dsPolarisSVA_out.data.car.rearSuspension.KWheelRateDynamicRL;
-
-
-auxData.P.ksVec = ksVec*motionRatio;
-dx = 0.00005;
-xBumpVec = 0.0035:dx:0.03;
-nNan = isnan(ksVec);
-pSpring = polyfit(xHeaveVec(~nNan), ksVec(~nNan), 5);
-kFit = polyval(pSpring, xBumpVec);
-% kFit = interp1(xHeaveVec, ksVec, xBumpVec, 'linear');
-auxData.P.xBumpVec = xBumpVec;
-auxData.P.ksVec = kFit;
-auxData.P.driver = sessionDetails('Driver');
-auxData.P.NLap = trackData.NLap;
-auxData.P.sLapStart = sLapStart;
-auxData.P.sLapEnd = sLapEnd;
-
-% Choose channels from track data 
-% HF content
-auxData.HF.tLap = (trackData.Timestamp - trackData.Timestamp(1))/1e9;
-auxData.P.ms = mean((1-trackData.rCarMass_VAP).*trackData.mCarSprung_VAP);
-auxData.P.mTotal = mean((1-trackData.rCarMass_VAP).*trackData.mCar_VAP);
-auxData.P.mu = (auxData.P.mTotal - auxData.P.ms);
-auxData.P.ct = 2*70e3;
-auxData.P.kt = 2*400e3;
-dT = diff(auxData.HF.tLap);
-auxData.HF.dT = dT;
-
-auxData.HF.RRH = trackData.hRideR_VAP/1000;
-auxData.HF.xBumpR = (trackData.xWheelSetupRL_VAP + trackData.xWheelSetupRR_VAP)/2/1000;
-
-auxData.HF.vCar = trackData.vCar;
-auxData.HF.FzRear = -trackData.FAeroAxleRWTCalc_VAP;
-
-xHubR0 = (trackData.zSetupWheelCenterRR0_PLR + trackData.zSetupWheelCenterRL0_PLR)/2/1000;
-auxData.P.xHubR0 = mean(xHubR0(~isnan(xHubR0)));
-auxData.HF.RRHSetup = trackData.hRideSetupR_VAP/1000;
-
-auxData.HF.sLap = trackData.sLap;
-auxData.HF.roadVec = randn(length(auxData.HF.tLap),1);
-fPass = 20; %50Hz lowpass freq
-fields = fieldnames(auxData.HF);
-deltaTime = 1/200;
-tVec = 0:deltaTime:auxData.HF.tLap(end);
-Fs = 1/mean(dT);
-for iField = 1:length(fields)
-    if strcmp(fields{iField}, 'tLap') || strcmp(fields{iField}, 'dT')
-    else
-        dataLP = lowpass(auxData.HF.(fields{iField}), fPass, Fs);
-        auxData.HF.(fields{iField}) = interp1(auxData.HF.tLap, dataLP, tVec, 'linear', 'extrap');
-    end
-end
-auxData.HF.tLap = tVec;
-fHP = 3;
-
-auxData.HF.xSetup = auxData.P.xHubR0 - auxData.HF.RRHSetup;
-
-auxData.HF.dRRH = auxData.HF.RRH - mean(auxData.HF.RRHSetup);
-auxData.HF.RRH_HP = highpass(auxData.HF.RRH, fHP, 1/deltaTime);
-auxData.HF.RRHDot_HP = [diff(auxData.HF.RRH_HP)/deltaTime, 0];
-auxData.HF.xBumpR_HP = highpass(auxData.HF.xBumpR, fHP, 1/deltaTime);
-
-auxData.HF.dRRHDot = [diff(auxData.HF.dRRH)/deltaTime, 0];
-auxData.HF.xBumpRDot = [diff(auxData.HF.xBumpR)/deltaTime, 0];
-
-auxData.HF.dxHubR = auxData.HF.xBumpR + auxData.HF.dRRH;
-auxData.HF.dxHubRDot = [diff(auxData.HF.dxHubR)/deltaTime, 0];
-auxData.HF.xHubR_HP = highpass(auxData.HF.dxHubR, fHP, 1/deltaTime);
-auxData.HF.xHubRDot_HP = [diff(auxData.HF.xHubR_HP)/deltaTime, 0];
-
-%% Finding index to look into
-[~, iStart] = min(abs(sLapStart - auxData.HF.sLap));
-[~, iEnd] = min(abs(sLapEnd - auxData.HF.sLap));
-auxData.HF.interval = iStart:iEnd;
-auxData.HF.intervalTime = 0:deltaTime:(length(auxData.HF.interval)*deltaTime-deltaTime);
-% auxData.HF.zRHeaveInterval = auxData.HF.zRHeave(auxData.HF.interval);
-% auxData.HF.zRHeaveDotInterval = auxData.HF.zRHeaveDot(auxData.HF.interval);
-auxData.HF.RRHInterval = auxData.HF.dRRH(auxData.HF.interval);
-auxData.HF.RRHDotInterval = auxData.HF.dRRHDot(auxData.HF.interval);
-
-auxData.HF.xHubRInterval = auxData.HF.dxHubR(auxData.HF.interval);
-auxData.HF.xHubRDotInterval = auxData.HF.dxHubRDot(auxData.HF.interval);
-
-auxData.HF.xBumpRInterval = auxData.HF.xBumpR(auxData.HF.interval);
-auxData.HF.xBumpRDotInterval = auxData.HF.xBumpRDot(auxData.HF.interval);
-auxData.HF.FzRearInterval = auxData.HF.FzRear(auxData.HF.interval);
-
-auxData.HF.vCarInterval = auxData.HF.vCar(auxData.HF.interval);
-auxData.HF.roadVecInterval = auxData.HF.roadVec(auxData.HF.interval);
 %% Plant model name, used for Adigator
-InternalDynamics=@Dynamics_Internal_stochRoad;
+InternalDynamics=@Dynamics_Internal_stochRoad_Param_Only;
 SimDynamics=@Dynamics_Sim;
 
 % Analytic derivative files (optional)
@@ -165,7 +31,7 @@ problem.analyticDeriv.hessianLagrangian=[];
 problem.analyticDeriv.jacConst=[];
 
 % Settings file
-problem.settings=@settings_AeroDamping_Track;
+problem.settings=@settings_AeroDamping_Track_PSD;
 
 %Initial Time. t0<tf
 problem.time.t0_min=0;
@@ -178,9 +44,10 @@ problem.time.tf_max=auxData.HF.intervalTime(end);
 guess.tf=auxData.HF.intervalTime(end);
 
 %% Parameters - Detailed Model - Assuming all can be found from data
-problem.parameters.pl=[auxData.P.kt-0.5*auxData.P.kt, 0, 0];
-problem.parameters.pu=[auxData.P.kt+auxData.P.kt, 2*auxData.P.ct, 1];
-guess.parameters=[auxData.P.kt, auxData.P.ct, 0.001];
+% p(1) = kt, p(2) = ct, p(4) = ka, p(5) = ca, p(3) = alpha
+problem.parameters.pl=[auxData.P.kt-0.5*auxData.P.kt, 0, 0, -5e6, -5e6];
+problem.parameters.pu=[3*auxData.P.kt, 2*auxData.P.ct, 1, 5e6, 5e6];
+guess.parameters=[auxData.P.kt, auxData.P.ct, 0.001, 0, 0];
 %% States - Detailed model
 % Initial conditions for system.
 problem.states.x0=[auxData.HF.RRHInterval(1), auxData.HF.RRHDotInterval(1), auxData.HF.xHubRInterval(1), auxData.HF.xHubRDotInterval(1)];
@@ -233,42 +100,24 @@ guess.states(:,4)=x4Guess;
 problem.inputs.N=0;       
       
 % Input bounds
-% u1 - ca;
-% u2 - ka;
-% u3 - zr;
+% No inputs
 
-
-problem.inputs.ul= [-5e7, -5e7, -2e4];
-problem.inputs.uu= [5e7, 5e7, 2e4];
-
-% problem.inputs.ul= -5e6;
-% problem.inputs.uu= 5e6;
+problem.inputs.ul= -1.5e4;
+problem.inputs.uu= -1e4;
 
 % Bounds on the first control action
-problem.inputs.u0l= [-5e5, -5e6, -2e4];
-problem.inputs.u0u= [5e5, 5e6, 2e4];
-
-% problem.inputs.u0l= -5e6;
-% problem.inputs.u0u= 5e6;
-
-% Input rate constraint
-% problem.inputs.url=[-1e4, -1e4, -1e4, -1e4];
-% problem.inputs.uru=[1e4, 1e4, 1e4, 1e4]; 
+problem.inputs.u0l= -1.5e4;
+problem.inputs.u0u= -1e4;
 
 % Input constraint error bounds
-problem.inputs.uConstraintTol=[10, 10, 10];
+problem.inputs.uConstraintTol=10;
 
 % problem.inputs.uConstraintTol= 10;
 
-% Guess ks and cs
-% ksDef = interp1(auxData.P.xBumpVec, auxData.P.ksVec, x1Guess-x3Guess, 'linear', 'extrap');
-% csDef = interp1(auxData.P.vDamVec, auxData.P.csVec, x2Guess-x4Guess, 'linear', 'extrap');
-
 % Guess the input sequences with [u0 uf]
-guess.inputs(:, 1) = zeros(length(auxData.HF.intervalTime), 1);
-guess.inputs(:, 2) = zeros(length(auxData.HF.intervalTime), 1);
-guess.inputs(:, 3) = auxData.HF.FzRearInterval;
-%% Set points
+guess.inputs(:, 1) = auxData.HF.FzRearInterval;
+
+% %% Set points
 % Choose the set-points if required
 problem.setpoints.states=[];
 problem.setpoints.inputs=[];
@@ -291,6 +140,7 @@ problem.constraints.bu=[];
 problem.constraints.bTol=[];
 
 % store the necessary problem parameters used in the functions
+auxData.P.roadVec = randn(length(auxData.HF.intervalTime),1);
 problem.data.auxData=auxData;
 
 
@@ -343,7 +193,6 @@ dataX4 = vdat.auxData.HF.xHubRDotInterval;
 dataX5 = vdat.auxData.HF.xBumpRInterval;
 dataX6 = vdat.auxData.HF.xBumpRDotInterval;
 
-dataRoad = vdat.auxData.HF.roadVecInterval;
 dataTime = vdat.auxData.HF.intervalTime;
 
 sampledTrackX1 = interp1(dataTime, dataX1, t, 'linear', 'extrap');
@@ -353,48 +202,63 @@ sampledTrackX4 = interp1(dataTime, dataX4, t, 'linear', 'extrap');
 sampledTrackX5 = interp1(dataTime, dataX5, t, 'linear', 'extrap');
 sampledTrackX6 = interp1(dataTime, dataX6, t, 'linear', 'extrap');
 
-sampledRoad = interp1(dataTime, dataRoad, t, 'linear', 'extrap');
+[track.x1_psd, track.y1_psd] = fnPSD(t, sampledTrackX1, 'HighPassFreq', 2, 'HighPassOrder', 3);
+[track.x2_psd, track.y2_psd] = fnPSD(t, sampledTrackX2, 'HighPassFreq', 2, 'HighPassOrder', 3);
+[track.x3_psd, track.y3_psd] = fnPSD(t, sampledTrackX5, 'HighPassFreq', 2, 'HighPassOrder', 3);
+[track.x4_psd, track.y4_psd] = fnPSD(t, sampledTrackX6, 'HighPassFreq', 2, 'HighPassOrder', 3);
 
-% e1 = x(:,1) - sampledTrackX1 + zr;
-% e2 = x(:,2) - sampledTrackX2;
-% e3 = x(:,3) - sampledTrackX3 + zr;
-% e4 = x(:,4) - sampledTrackX4; 
+alpha = p(1,3);
+zrDot = alpha*interp1(vdat.auxData.HF.intervalTime, vdat.auxData.HF.roadVec, t, 'linear', 'extrap');
 
-e1 = x(:,1) - sampledTrackX1;
-e2 = x(:,2) - sampledTrackX2 - sampledRoad;
-% e3 = x(:,3) - sampledTrackX3;
-% e4 = x(:,4) - sampledTrackX4 - u(:,3); 
-e5 = (x(:,3)-x(:,1)) - sampledTrackX5;
-e6 = (x(:,4)-x(:,2)) - sampledTrackX6;
+if size(x,1) == length(t)
+    [model.x1_psd, model.y1_psd] = fnPSD(t, x(:,1), 'HighPassFreq', 2, 'HighPassOrder', 3);
+    [model.x2_psd, model.y2_psd] = fnPSD(t, (x(:,2) - zrDot), 'HighPassFreq', 2, 'HighPassOrder', 3);
+    [model.x3_psd, model.y3_psd] = fnPSD(t, (x(:,3) - x(:,1)), 'HighPassFreq', 2, 'HighPassOrder', 3);
+    [model.x4_psd, model.y4_psd] = fnPSD(t, (x(:,4) - x(:,2)), 'HighPassFreq', 2, 'HighPassOrder', 3);
+    
+    % Resample to the same length in frequency domain
+    f = 0:0.01:10;
+    
+    %Resample track
+    TrackX1 = interp1(track.x1_psd, track.y1_psd, f, 'linear');
+    TrackX2 = interp1(track.x2_psd, track.y2_psd, f, 'linear');
+    TrackX3 = interp1(track.x3_psd, track.y3_psd, f, 'linear');
+    TrackX4 = interp1(track.x4_psd, track.y4_psd, f, 'linear');
+    
+    % Resample Model
+    ModelX1 = interp1(model.x1_psd, model.y1_psd, f, 'linear');
+    ModelX2 = interp1(model.x2_psd, model.y2_psd, f, 'linear');
+    ModelX3 = interp1(model.x3_psd, model.y3_psd, f, 'linear');
+    ModelX4 = interp1(model.x4_psd, model.y4_psd, f, 'linear');
+    
+    % Weightings
+     q1 = 1e6;
+    q2 = 1e-2;
+    q3 = 2e7;
+    q4 = 1e1;
+    
+    % errors
+    e1 = abs(TrackX1 - ModelX1);
+    e2 = abs(TrackX2 - ModelX2);
+    e3 = abs(TrackX3 - ModelX3);
+    e4 = abs(TrackX4 - ModelX4);
 
-% e1 = x(:,1) - sampledTrackX1;
-% e2 = x(:,2) - sampledTrackX2;
-% e3 = x(:,3) - sampledTrackX3;
-% e4 = x(:,4) - sampledTrackX4;
-
-% dX4 = [diff(x(:,4))./diff(t), 0];
-% e5 = Ftotal/kt - (x(:,3));
-% e5 = Ftotal/kt - (x(:,3) - u(:,5));
-% u1 = u(:,1);
-% u2 = u(:,2);
-q1 = 1e5;
-q2 = 1e2;
-q3 = 1e4;
-q4 = 1;
-q5 = 1e5;
-q6 = 1e2;
-% q5 = 1e2;
-
-% stageCost = q1*e1.*e1 + q2*e2.*e2 + q3*e3.*e3 + q4*e4.*e4 + q5*e5.*e5;
-% stageCost = q1*e1.*e1 + q2*e2.*e2 + q3*e3.*e3 + q4*e4.*e4;
-% stageCost = q1*e1.*e1 + q2*e2.*e2 + q5*e5.*e5 + q6*e6.*e6;
-stageCost = q1*e1.*e1 + q5*e5.*e5;
-
-% stageCost = q1*e1.*e1;
+%     Cost = q1*e1*(e1') + q3*e3*(e3');
+%     Cost = q1*e1*(e1');
+    Cost = q1*e1*(e1') + q3*e3*(e3') + q2*e2*(e2') + q4*e4*(e4');
+else
+    Cost = inf;
+end
+dX1 = abs(mean(sampledTrackX1) - mean(x(:,1)));
+dX3 = abs(mean(sampledTrackX5) - mean(x(:,3)-x(:,1)));
+Q1 = 1;
+Q3 = 1;
+Cost = Cost + (Q1*dX1 + Q3*dX3);
+stageCost = Cost*ones(length(t),1);
 %------------- END OF CODE --------------
 
 
-function boundaryCost=E_unscaled(x0,xf,u0,uf,p,t0,tf,data) 
+function boundaryCost=E_unscaled(x0,xf,u0,uf,p,t0,tf,vdat) 
 
 % E_unscaled - Returns the boundary value cost
 %
@@ -414,9 +278,7 @@ function boundaryCost=E_unscaled(x0,xf,u0,uf,p,t0,tf,data)
 %    boundaryCost - Scalar boundary cost
 %
 %------------- BEGIN CODE --------------
-
 boundaryCost= 0;
-
 %------------- END OF CODE --------------
 
 

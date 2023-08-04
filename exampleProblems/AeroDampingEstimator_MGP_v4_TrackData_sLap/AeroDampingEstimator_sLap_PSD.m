@@ -247,9 +247,9 @@ if size(x,1) == length(t)
     e3 = abs(TrackX3 - ModelX3);
     e4 = abs(TrackX4 - ModelX4);
 
-    Cost = q1*e1*(e1') + q2*e2*(e2') + q3*e3*(e3') + q4*e4*(e4');
+%     Cost = q1*e1*(e1') + q2*e2*(e2') + q3*e3*(e3') + q4*e4*(e4');
 %     Cost = q1*e1*(e1');
-%     Cost = q1*e1*(e1') + q3*e3*(e3');
+    Cost = q1*e1*(e1') + q3*e3*(e3');
 else
     Cost = inf;
 end

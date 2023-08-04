@@ -62,6 +62,6 @@ end
 fPlotFigures_sLap_v2
 %% Eigenvalue plotting
 
-% Eigenvalues EoS
-[lambdaEoS, eigVecEoS] = fGetEigenvalues(problemEoS, solutionEoS);
-
+% % Eigenvalues EoS
+% [lambdaEoS, eigVecEoS] = fGetEigenvalues(problemEoS, solutionEoS);
+% 
